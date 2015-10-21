@@ -19,6 +19,8 @@ DSTs = {}
 PAT = {}
 PMT = {}
 CA_PIDs = {}
+tableLen = {}
+tableData = {}
 
 sock = ""
 
@@ -183,7 +185,7 @@ def parsePATSection(filehandle, k):
     table_id = (local>>24)
     if (table_id != 0x0):
         print 'Ooops! error in parsePATSection()!'
-        return
+	raise
 
 #    print '------- PAT Information -------'
     section_length = (local>>8)&0xFFF
@@ -220,7 +222,7 @@ def parsePATSection(filehandle, k):
 #        print ''
 
 
-def parsePMTSection(filehandle, k):
+def parsePMTSection(filehandle, k, PID):
 
     local = readFile(filehandle,k,4)
 
@@ -229,12 +231,14 @@ def parsePMTSection(filehandle, k):
     table_id = (local>>24)
     if (table_id != 0x2):
         print 'Ooops! error in parsePMTSection()!'
-        return
+	raise
 
 #    print '------- PMT Information -------'
 
     section_length = (local>>8)&0xFFF
 #    print 'section_length = %d' %section_length
+
+    tableLen[PID] = section_length
 
     program_number = (local&0xFF) << 8;
 
@@ -308,6 +312,7 @@ def parsePMTSection(filehandle, k):
     PMT[program_number]=esPIDs
     CA_PIDs[program_number]=CAs
 #    print PMT
+    return section_length
 
 def main():
 
@@ -352,6 +357,7 @@ def main():
 	print "PAT",PAT
 	print "PMT",PMT
 	print "CA_PIDs",CA_PIDs
+	print "tableLen",tableLen
 	pktCnt = 0
 	scrambledCnt = 0
 	lastTime = time.time()
@@ -427,7 +433,14 @@ def main():
 	    if PAT[ePID] == PID:
 #		print PAT
 		try:
-		    parsePMTSection(packet,5)
+		    local = readFile(packet,5,4)
+		    table_id = (local>>24)
+		    if (table_id == 0x2):
+			tableData[PID] = packet[5:] 
+		    else:
+			tableData[PID] += packet
+#		    if (PID in tableLen) and (len(tableData[PID]) > tableLen[PID]):
+		    parsePMTSection(tableData[PID],0,PID)
 		except:
 		    print 'Failed to parse PMT with PID: ', PID
 
