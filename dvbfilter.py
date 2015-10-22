@@ -16,11 +16,15 @@ counter = {}
 datas = {}
 DSTs = {}
 
+IP_PID = {}
+
 PAT = {}
 PMT = {}
 CA_PIDs = {}
-tableLen = {}
-tableData = {}
+
+PMTs = []
+
+PMTdata = {}
 
 sock = ""
 
@@ -160,6 +164,7 @@ def loadConfig():
 
     for IP in DSTs:
         datas[IP] = ""
+	IP_PID[IP] = []
 
 
 def readFile(filehandle, startPos, width):
@@ -214,6 +219,10 @@ def parsePATSection(filehandle, k):
 #            print 'network_PID = 0x%X' %program_map_PID
         else:
 	    PAT[program_number] = program_map_PID
+	    if not program_map_PID in PMTdata:
+		PMTdata[program_map_PID] = ['','','','','','','','']
+	    if not program_map_PID in PMTs:
+		PMTs.append(program_map_PID)
 #            print 'program_map_PID = 0x%X' %program_map_PID
 
         length = length - 4;
@@ -222,23 +231,37 @@ def parsePATSection(filehandle, k):
 #        print ''
 
 
-def parsePMTSection(filehandle, k, PID):
+def parsePMTSection(PID):
 
-    local = readFile(filehandle,k,4)
-
+    k = 1
     esPIDs = []
 
-    table_id = (local>>24)
-    if (table_id != 0x2):
-        print 'Ooops! error in parsePMTSection()!'
+    foundFirst=0
+
+    filehandle = ''.join(PMTdata[PID])
+
+#    filehandle = PMTdata[PID]
+
+#    print filehandle.encode('hex')
+
+    while not foundFirst and len(filehandle) > k:
+
+        local = readFile(filehandle,k,4)
+        table_id = (local>>24)
+    	if (table_id == 0x2):
+	    foundFirst=1
+	else:
+	    k += 184
+
+    if not foundFirst:
 	raise
+
+#     print "found on position ", k
 
 #    print '------- PMT Information -------'
 
     section_length = (local>>8)&0xFFF
 #    print 'section_length = %d' %section_length
-
-    tableLen[PID] = section_length
 
     program_number = (local&0xFF) << 8;
 
@@ -314,15 +337,22 @@ def parsePMTSection(filehandle, k, PID):
 #    print PMT
     return section_length
 
+sendsock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
+
+def send_to(IP, data):
+
+  datas[IP] += data
+  if (len(datas[IP]) > 1315):
+      sendsock.sendto(datas[IP], (IP, 1234))
+      datas[IP] = "" 
+		
+
 def main():
 
   signal.signal(signal.SIGUSR1, handleSignal)
   signal.signal(signal.SIGUSR2, handleSignal)
 
   loadConfig()
-
-  sendsock = socket.socket(socket.AF_INET, # Internet
-                     socket.SOCK_DGRAM) # UDP
 
   pktCnt = 0
   scrambledCnt = 0
@@ -357,7 +387,6 @@ def main():
 	print "PAT",PAT
 	print "PMT",PMT
 	print "CA_PIDs",CA_PIDs
-	print "tableLen",tableLen
 	pktCnt = 0
 	scrambledCnt = 0
 	lastTime = time.time()
@@ -371,84 +400,31 @@ def main():
 	PID = readFile(packet, 1, 2) & 0x1fff
 	hasPayload = (ord(packet[3]) & 16) != 0
 
-#	print PID
-
 	if not hasPayload:
 	    continue
 	
-#	PID = ord(packet[2]) + (ord(packet[1]) % 32) * 256
-#	CC = ord(packet[3]) % 16
-#	hasPayload = (ord(packet[3]) & 16) != 0
-#	scrambled = (ord(packet[3]) & 0xc0) !=0
-
-#	if scrambled:
-#		scrambledCnt += 1
-
-	#print MCAST_GRP, CC
-
 	if packet == oldpacket:
-		#sys.stdout.write('D')
-#		print "DUP!"
-		continue
-#		a=0
+	    continue
 
-	for IP in DSTs:
-	 try:
-	  SID = DSTs[IP]
-	  if ((SID in PMT) and (SID in PAT)) or (SID == 0):
-#	    print PMT[DSTs[IP]]
-#	    if (PID in CA_PIDs[SID]):
-	    if (PID < 32) or (SID == 0) or (PID in PMT[SID]) or (PID == PAT[SID]) or (PID in CA_PIDs[SID]):
-		datas[IP] += packet
-		if (len(datas[IP]) > 1315):
-		    sendsock.sendto(datas[IP], (IP, 1234))
-		    datas[IP] = "" 
-	 except:
-	   pass
-
-#	if PID == 0:
-#	    print packet[13:].encode("hex")
-#	    patc = packet[13:]
-#	    while len(patc)>3:
-#		SID = struct.unpack(">h", patc[:2])[0]
-#		if SID > 0:
-#			PAT[SID] = struct.unpack(">h", patc[2:4])[0] & 0x1FFF
-#		patc = patc[4:]
+	for IP in IP_PID:
+#	if False:
+	    PIDs = IP_PID[IP]
+	    if (PIDs == 0):
+		send_to(IP, packet)
+	    elif (PID in PIDs) or (PID < 32):
+		send_to(IP, packet)
 
 	if PID == 0:
 	    parsePATSection(packet,5)
 
-#	if PID == 1:
-#	    print packet.encode("hex")
+	if PID in PMTs:
+	    PMTdata[PID][CC] = packet[4:]
+ 	    try:
+ 		parsePMTSection(PID)
+ 	    except:
+ 		print "HUPS!!"
+		pass
 
-#	if PID == 7000:
-#	    print packet.encode("hex")
-#	    patc = packet[68:]
-#	    while len(patc)>3:
-#		ePID = struct.unpack(">h", patc[:2])[0] & 0x1fff
-#		print ePID
-#		patc = patc[5:]
-
-	for ePID in PAT:
-	    if PAT[ePID] == PID:
-#		print PAT
-		try:
-		    local = readFile(packet,5,4)
-		    table_id = (local>>24)
-		    if (table_id == 0x2):
-			tableData[PID] = packet[5:] 
-		    else:
-			tableData[PID] += packet
-#		    if (PID in tableLen) and (len(tableData[PID]) > tableLen[PID]):
-		    parsePMTSection(tableData[PID],0,PID)
-		except:
-		    print 'Failed to parse PMT with PID: ', PID
-
-	if (PID in counter) and (counter[PID] + 1 != CC) and (CC != 0) and hasPayload:
-	    print "ccerror", PID, "expected", counter[PID] + 1, "got", CC
-	    CCerrors += 1
-
-	counter[PID] = CC
 	oldpacket = packet
 
 
