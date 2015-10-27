@@ -28,7 +28,7 @@ def main():
       print 'Expection'
 #    hexdata = binascii.hexlify(data)
 #    print 'Data = %s' % hexdata
-    print data
+    sys.stdout.write(data)
 
 if __name__ == '__main__':
   main()
