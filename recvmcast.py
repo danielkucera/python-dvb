@@ -2,10 +2,11 @@
 
 import socket
 import binascii
+import sys
 
 def main():
-  MCAST_GRP = '239.100.1.5' 
-  MCAST_PORT = 1234
+  MCAST_GRP = sys.argv[1]
+  MCAST_PORT = int(sys.argv[2])
   sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
   try:
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
