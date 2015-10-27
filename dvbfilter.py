@@ -87,49 +87,60 @@ def loadConfig():
 	fcntl.ioctl(fefd, linuxdvb.FE_GET_INFO, feinfo)
 	print feinfo.name
 
-	# Tune
-	pol = config.get('main','pol')
-	if (pol == 'V') or (pol == 'v'):
-		print 'volt', fcntl.ioctl(fefd, linuxdvb.FE_SET_VOLTAGE, linuxdvb.SEC_VOLTAGE_13) #13 - V
-	else:
-		print 'volt', fcntl.ioctl(fefd, linuxdvb.FE_SET_VOLTAGE, linuxdvb.SEC_VOLTAGE_18) #18 - V
 
-	time.sleep(0.250)
+	while True:
 
-	freq = config.getint('main','freq')
+		# Tune
+		pol = config.get('main','pol')
+		if (pol == 'V') or (pol == 'v'):
+			print 'volt', fcntl.ioctl(fefd, linuxdvb.FE_SET_VOLTAGE, linuxdvb.SEC_VOLTAGE_13) #13 - V
+		else:
+			print 'volt', fcntl.ioctl(fefd, linuxdvb.FE_SET_VOLTAGE, linuxdvb.SEC_VOLTAGE_18) #18 - V
+	
+		time.sleep(0.250)
+	
+		freq = config.getint('main','freq')
+	
+		if (freq > 11700):
+			print 'tone', fcntl.ioctl(fefd, linuxdvb.FE_SET_TONE, linuxdvb.SEC_TONE_ON) # ON - 11.7 hi
+			loFreq = freq - 10600
+		else:
+			print 'tone', fcntl.ioctl(fefd, linuxdvb.FE_SET_TONE, linuxdvb.SEC_TONE_OFF) # OFF - 11.7 hi
+			loFreq = freq - 9750
+	
+		time.sleep(0.250)
+	
+		srate = config.getint('main','srate')
+	
+	#	dtv_prop = ctypes.POINTER(linuxdvb.dtv_property())
+		dtv_prop = linuxdvb.dtv_property()
+		dtv_prop.cmd = linuxdvb.DTV_DELIVERY_SYSTEM
+		dtv_prop.u.data = linuxdvb.SYS_DVBS2
+	
+		dtv_props = linuxdvb.dtv_properties()
+		dtv_props.num = 1
+	#	dtv_props.props = ctypes.POINTER(dtv_prop)
+	#	dtv_props.props = ctypes.cast(dtv_prop, ctypes.POINTER(ctypes.Structure))
+		dtv_props.props = ctypes.pointer(dtv_prop)
+		print 'props', fcntl.ioctl(fefd, linuxdvb.FE_SET_PROPERTY, dtv_props)
+	
+		params = linuxdvb.dvb_frontend_parameters()
+		params.frequency = loFreq * 1000
+		params.inversion = linuxdvb.INVERSION_AUTO
+		params.u.qpsk.symbol_rate = srate * 1000
+		params.u.qpsk.fec_inner = linuxdvb.FEC_AUTO
+		print 'front', fcntl.ioctl(fefd, linuxdvb.FE_SET_FRONTEND, params)
+	
+		fcntl.ioctl(fefd, linuxdvb.FE_GET_FRONTEND, params)
+		print params.u.qpsk.fec_inner
 
-	if (freq > 11700):
-		print 'tone', fcntl.ioctl(fefd, linuxdvb.FE_SET_TONE, linuxdvb.SEC_TONE_ON) # ON - 11.7 hi
-		loFreq = freq - 10600
-	else:
-		print 'tone', fcntl.ioctl(fefd, linuxdvb.FE_SET_TONE, linuxdvb.SEC_TONE_OFF) # OFF - 11.7 hi
-		loFreq = freq - 9750
-
-	time.sleep(0.250)
-
-	srate = config.getint('main','srate')
-
-#	dtv_prop = ctypes.POINTER(linuxdvb.dtv_property())
-	dtv_prop = linuxdvb.dtv_property()
-	dtv_prop.cmd = linuxdvb.DTV_DELIVERY_SYSTEM
-	dtv_prop.u.data = linuxdvb.SYS_DVBS2
-
-	dtv_props = linuxdvb.dtv_properties()
-	dtv_props.num = 1
-#	dtv_props.props = ctypes.POINTER(dtv_prop)
-#	dtv_props.props = ctypes.cast(dtv_prop, ctypes.POINTER(ctypes.Structure))
-	dtv_props.props = ctypes.pointer(dtv_prop)
-	print 'props', fcntl.ioctl(fefd, linuxdvb.FE_SET_PROPERTY, dtv_props)
-
-	params = linuxdvb.dvb_frontend_parameters()
-	params.frequency = loFreq * 1000
-	params.inversion = linuxdvb.INVERSION_AUTO
-	params.u.qpsk.symbol_rate = srate * 1000
-	params.u.qpsk.fec_inner = linuxdvb.FEC_AUTO
-	print 'front', fcntl.ioctl(fefd, linuxdvb.FE_SET_FRONTEND, params)
-
-	fcntl.ioctl(fefd, linuxdvb.FE_GET_FRONTEND, params)
-	print params.u.qpsk.fec_inner
+		festatus = linuxdvb.dvb_frontend_event()
+		fcntl.ioctl(fefd, linuxdvb.FE_READ_STATUS, festatus)
+		if festatus.status & 0x10:
+			print "FE_HAS_LOCK"
+			break
+		else:
+			print "No lock!"
 
 	dmfd = open(adapter + 'demux0', 'r+')
 
@@ -406,8 +417,8 @@ def main():
 	if packet == oldpacket:
 	    continue
 
-	for IP in IP_PID:
-#	if False:
+#	for IP in IP_PID:
+	if False:
 	    PIDs = IP_PID[IP]
 	    if (PIDs == 0):
 		send_to(IP, packet)
