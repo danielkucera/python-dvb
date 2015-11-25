@@ -47,9 +47,12 @@ def main():
 	print "Have stream"
 
     if lastTime + 1 < time.time():
-	print (float(scrambledCnt)/(pktCnt + 1))*100, "% scrambled"
-	print CCerrors, " CC errors"
-	print counter.keys()
+	print (round(float(scrambledCnt)/(pktCnt + 1))*100), "% scrambled",
+	print CCerrors, "CC errors",
+	print (pktCnt*188*8)/1024, "Kbps",
+	print counter.keys(),
+	sys.stdout.flush()
+	print "\r",
 	pktCnt = 0
 	scrambledCnt = 0
 	lastTime = time.time()
