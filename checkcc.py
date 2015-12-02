@@ -44,12 +44,13 @@ def main():
 
     if not haveStream:
 	haveStream = True
-	print "Have stream"
+	print datetime.datetime.now(), "Have stream"
 
     if lastTime + 1 < time.time():
-	print (round(float(scrambledCnt)/(pktCnt + 1)*100)), "%crypt,",
-	print CCerrors, "CCerr,",
-	print (pktCnt*188*8)/1024, "Kbps,",
+	print int((round(float(scrambledCnt)/(pktCnt + 1)*100))), "%crypt",
+	print CCerrors, "CCerr",
+	print (pktCnt*188*8)/1024, "Kbps",
+	print addr,
 	print "PIDs:",counter.keys(),
 	sys.stdout.flush()
 	print "\r",
