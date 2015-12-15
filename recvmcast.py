@@ -16,10 +16,9 @@ def main():
   sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
 
   sock.bind((MCAST_GRP, MCAST_PORT))
-  host = socket.gethostbyname(socket.gethostname())
-  sock.setsockopt(socket.SOL_IP, socket.IP_MULTICAST_IF, socket.inet_aton(host))
+  sock.setsockopt(socket.SOL_IP, socket.IP_MULTICAST_IF, socket.inet_aton("0.0.0.0"))
   sock.setsockopt(socket.SOL_IP, socket.IP_ADD_MEMBERSHIP, 
-                  socket.inet_aton(MCAST_GRP) + socket.inet_aton(host))
+                  socket.inet_aton(MCAST_GRP) + socket.inet_aton("0.0.0.0"))
 
   while 1:
     try:
