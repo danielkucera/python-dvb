@@ -25,38 +25,52 @@ def main():
   sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
 
   sock.bind((MCAST_GRP, MCAST_PORT))
-  host = socket.gethostbyname(socket.gethostname())
+  host = socket.gethostbyname('0.0.0.0')
   sock.setsockopt(socket.SOL_IP, socket.IP_MULTICAST_IF, socket.inet_aton(host))
   sock.setsockopt(socket.SOL_IP, socket.IP_ADD_MEMBERSHIP, 
                   socket.inet_aton(MCAST_GRP) + socket.inet_aton(host))
+
+  sock.setblocking(0)
 
   pktCnt = 0
   scrambledCnt = 0
   CCerrors = 0
   haveStream = False
   lastTime = 0
+  addr = ""
 
   while 1:
     try:
-      data, addr = sock.recvfrom(1316)
+      data, rcvAddr = sock.recvfrom(1316)
+      if addr == "":
+	addr = rcvAddr
+      if addr != rcvAddr:
+	continue
+      if lastTime + 1 < time.time():
+	if pktCnt > 0:
+		if not haveStream:
+			haveStream = True
+			print "\nHAVE STREAM!"
+	else:
+		if haveStream:
+			haveStream = False
+			print "\nLOST STREAM!"
+		
+	print datetime.datetime.now(),
+  	print int((round(float(scrambledCnt)/(pktCnt + 1)*100))), "%crypt",
+  	print (pktCnt*188*8)/1024, "Kbps",
+  	scrambledCnt = 0
+  	pktCnt = 0
+  	print CCerrors, "CCerr",
+  	print addr,
+#  	print "PIDs:",counter.keys(),
+  	sys.stdout.flush()
+  	print "\r",
+  	lastTime = time.time()
+  
     except socket.error, e:
-      print 'Expection'
-
-    if not haveStream:
-	haveStream = True
-	print datetime.datetime.now(), "Have stream"
-
-    if lastTime + 1 < time.time():
-	print int((round(float(scrambledCnt)/(pktCnt + 1)*100))), "%crypt",
-	print CCerrors, "CCerr",
-	print (pktCnt*188*8)/1024, "Kbps",
-	print addr,
-	print "PIDs:",counter.keys(),
-	sys.stdout.flush()
-	print "\r",
-	pktCnt = 0
-	scrambledCnt = 0
-	lastTime = time.time()
+      pass
+      continue
 
     while len(data) > 0:
     	pktCnt += 1
