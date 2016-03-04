@@ -31,6 +31,7 @@ def main():
                   socket.inet_aton(MCAST_GRP) + socket.inet_aton(host))
 
   sock.setblocking(0)
+  sock.settimeout(0.01)
 
   pktCnt = 0
   scrambledCnt = 0
