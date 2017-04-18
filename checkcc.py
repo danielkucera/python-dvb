@@ -16,7 +16,10 @@ def main():
   MCAST_GRP = sys.argv[1]
   MCAST_PORT = int(sys.argv[2])
 
-  sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+  if MCAST_PORT > 0:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+  else:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_UDP)
   try:
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
   except AttributeError:
@@ -24,7 +27,8 @@ def main():
   sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 32) 
   sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
 
-  sock.bind((MCAST_GRP, MCAST_PORT))
+  if MCAST_PORT > 0:
+    sock.bind((MCAST_GRP, MCAST_PORT))
   host = socket.gethostbyname('0.0.0.0')
   sock.setsockopt(socket.SOL_IP, socket.IP_MULTICAST_IF, socket.inet_aton(host))
   sock.setsockopt(socket.SOL_IP, socket.IP_ADD_MEMBERSHIP, 
@@ -43,6 +47,11 @@ def main():
   while 1:
     try:
       data, rcvAddr = sock.recvfrom(1316)
+      if MCAST_PORT == 0:
+        sport = 256 * ord(data[20]) + ord(data[21])
+        dport = 256 * ord(data[22]) + ord(data[23])
+        data = data[28:]
+#      print data.encode("hex")
       if addr == "":
 	addr = rcvAddr
       if addr != rcvAddr:
@@ -64,6 +73,9 @@ def main():
   	pktCnt = 0
   	print CCerrors, "CCerr",
   	print addr,
+	if MCAST_PORT == 0:
+  	  print "SP:", sport,
+  	  print "DP:", dport,
 #  	print "PIDs:",counter.keys(),
   	sys.stdout.flush()
   	print "\r",
