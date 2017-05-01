@@ -27,8 +27,7 @@ def main():
   sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 32) 
   sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
 
-  if MCAST_PORT > 0:
-    sock.bind((MCAST_GRP, MCAST_PORT))
+  sock.bind((MCAST_GRP, MCAST_PORT))
   host = socket.gethostbyname('0.0.0.0')
   sock.setsockopt(socket.SOL_IP, socket.IP_MULTICAST_IF, socket.inet_aton(host))
   sock.setsockopt(socket.SOL_IP, socket.IP_ADD_MEMBERSHIP, 
@@ -46,17 +45,17 @@ def main():
 
   while 1:
     try:
-      data, rcvAddr = sock.recvfrom(1316)
+      data, rcvAddr = sock.recvfrom(65565)
       if MCAST_PORT == 0:
         sport = 256 * ord(data[20]) + ord(data[21])
         dport = 256 * ord(data[22]) + ord(data[23])
         data = data[28:]
 #      print data.encode("hex")
-      if addr == "":
-	addr = rcvAddr
-      if addr != rcvAddr:
-	continue
       if lastTime + 1 < time.time():
+	# set accepted source to last packet source
+	if addr != rcvAddr:
+	  addr = rcvAddr
+	  print "\nfound source",addr,"- adjusting filter"
 	if pktCnt > 0:
 		if not haveStream:
 			haveStream = True
@@ -80,6 +79,9 @@ def main():
   	sys.stdout.flush()
   	print "\r",
   	lastTime = time.time()
+      # accept packets only from defined source
+      if addr != rcvAddr:
+	continue
   
     except socket.error, e:
       pass
@@ -89,6 +91,9 @@ def main():
     	pktCnt += 1
 	packet = data[:188]
 	data = data[188:]
+	if packet[0] != '\x47':
+          print rcvAddr,"Not mpegts header!"
+          continue
 	PID = ord(packet[2]) + (ord(packet[1]) % 32) * 256
 	CC = ord(packet[3]) % 16
 	hasPayload = (ord(packet[3]) & 16) != 0
@@ -105,7 +110,7 @@ def main():
 		a=0
 
 	if (PID in counter) and (counter[PID] + 1 != CC) and (CC != 0) and hasPayload:
-	    print datetime.datetime.now(),"ccerror", MCAST_GRP, PID, "expected", counter[PID] + 1, "got", CC
+	    print datetime.datetime.now(),"ccerror", MCAST_GRP, PID, "expected", counter[PID] + 1, "got", CC, " "
 	    CCerrors += 1
 
 	counter[PID] = CC
